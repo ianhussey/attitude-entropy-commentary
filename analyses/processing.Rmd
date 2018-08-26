@@ -1,0 +1,56 @@
+---
+title: "Trim Attitudes 2.0 dataset"
+author: "Ian Hussey^[Ghent University. Email: ian.hussey@ugent.be]"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document:
+    code_folding: hide
+    highlight: haddock
+    theme: flatly
+    toc: no
+    toc_float: no
+---
+
+Trim data
+
+- complete IAT data
+- standard IAT accuracy and latency performance criteria
+- fluent english
+
+```{r}
+
+# dependencies
+library(tidyverse)
+
+# get data
+load("~/git/Attitudes-2.0/data/processed/attitudes_2.0_data.RData")
+
+# trim data 
+trimmed_data <- attitudes_2.0_data %>%
+
+  # only complete data
+  filter(complete_iat_data == TRUE) %>%
+  
+  # exclude people who failed the IAT, on the rationale that this provides a metric to exclude low quality/effort data
+  filter(exclude_iat == FALSE) %>%
+  
+  # only Ss who speak english regularly or are fluent
+  filter(english_fluency == "English is my primary language" | 
+           english_fluency == "English fluent - speak/read it regularly" |
+           english_fluency == "English fluent - speak/read infrequently") %>%
+  dplyr::select(session_id,
+                domain, iat_type, sex, age,
+                D,
+                D_first_half, D_second_half,
+                D_parcel_1, D_parcel_2, D_parcel_3, 
+                think_mean,
+                gut_x, gut_y,
+                actual_x, actual_y)
+
+# save to disk
+save(trimmed_data, file = "trimmed_data.RData")
+
+```
+
+
+

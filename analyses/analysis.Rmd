@@ -1,0 +1,193 @@
+---
+title: "Analyses"
+author: "Ian Hussey^[Ghent University. Email: ian.hussey@ugent.be]"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document:
+    code_folding: hide
+    highlight: haddock
+    theme: flatly
+    toc: yes
+    toc_float: yes
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(message=FALSE,
+                      warning=FALSE,
+                      cache.lazy=FALSE)
+```
+
+```{r}
+
+# dependencies
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(timesavers)
+library(psych)
+library(lme4)
+library(sjPlot)
+library(sjstats)
+
+# options
+options(knitr.table.format = "html") # necessary configuration of tables
+
+# disable scientific notation
+options(scipen = 999) 
+
+# get data
+load("trimmed_data.RData") 
+
+```
+
+# Available N
+
+```{r}
+
+trimmed_data %>%
+  summarize(n = n())
+
+trimmed_data %>%
+  group_by(domain) %>%
+  summarize(n = n()) %>%
+  summarize(max = max(n),
+            min = min(n),
+            mean = mean(n))
+
+```
+
+# Predicion 1b
+
+"Scores on implicit measures assessing attitudes individuals regualrly think about are expected to have higher internal consistency ... than scores on implicit measures assessing attitudes individuals think only rarely about"
+
+IC_low_frequency < IC_high_frequency
+
+```{r}
+
+# alpha values
+D_alpha <- trimmed_data %>%
+  select(domain, iat_type, D_first_half, D_second_half) %>%
+  na.omit() %>%
+  filter(iat_type == "Evaluation") %>%
+  group_by(domain) %>%
+  do(alpha = psych::alpha(., warnings = FALSE)$total$raw_alpha) %>%
+  mutate(alpha = round(alpha, 3)) %>%
+  ungroup() %>%
+  rename(D_alpha = alpha)
+
+# omega t data
+est_omega_t <- function(data){
+  require(timesavers)
+  require(psych)
+  results <- data %>%
+    dplyr::select(-domain, -iat_type) %>%
+    psych::omega(plot = FALSE)
+  omega_t <- round(results$omega.tot, 3)
+  return(omega_t)
+}
+
+D_omega_t <- trimmed_data %>%
+  select(domain, iat_type, D_parcel_1, D_parcel_2, D_parcel_3) %>%
+  na.omit() %>%
+  filter(iat_type == "Evaluation") %>%
+  group_by(domain, iat_type) %>%
+  do(D_omega_t = est_omega_t(.)) %>%
+  mutate(D_omega_t = round(D_omega_t, 3))
+
+# frequency data
+frequency_data <- trimmed_data %>%
+  select(domain, iat_type, think_mean) %>%
+  filter(iat_type == "Evaluation") %>%
+  na.omit() %>%
+  group_by(domain) %>%
+  summarize(frequency_think = mean(think_mean)) %>%
+  ungroup() %>%
+  right_join(D_alpha, by = "domain") %>%
+  right_join(D_omega_t, by = "domain")
+
+```
+
+## Alpha
+
+```{r}
+
+# model
+fit_1 <- lm(frequency_think ~ D_alpha,
+            data = frequency_data)
+
+# data
+sjt.lm(fit_1, show.std = TRUE)
+
+# plot
+sjp.lm(fit_1)
+
+```
+
+## Omega t
+
+```{r}
+
+# model
+fit_2 <- lm(frequency_think ~ D_omega_t,
+            data = frequency_data)
+
+# table
+sjt.lm(fit_2, show.std = TRUE)
+
+# plot
+sjp.lm(fit_2)
+
+```
+
+# Prediction 3
+
+"Attitudes are expected to be less polarized than when individuals are given more time to answer the questions""
+
+extremity_actual < extremity_gut
+
+```{r}
+
+# reshape data
+domain_data <- trimmed_data %>%
+  select(session_id, domain) %>%
+  distinct()
+
+extremity_ratings_data <- trimmed_data %>%
+  select(session_id, domain, gut_x, gut_y, actual_x, actual_y) %>%
+  na.omit() %>%
+  # convert ratings of positive vs negative (1 to 10) to absolute extremity of ratings as they diverge from neturality:
+  # split each scale at the mid point (5.5, given 1-10 response options) and find absolute values
+  # then add 0.5 to give integer values.
+  mutate(gut_x = abs(gut_x - 5.5) + 0.5,
+         gut_y = abs(gut_y - 5.5) + 0.5,
+         actual_x = abs(actual_x - 5.5) + 0.5,
+         actual_y = abs(actual_y - 5.5) + 0.5) %>%
+  group_by(session_id) %>%
+  # average the extremity ratings for the two categories
+  summarize(gut = mean(c(gut_x, gut_y)),
+            actual = mean(c(actual_x, actual_y))) %>%
+  ungroup() %>%
+  gather(type, rating, c(actual, gut)) %>%
+  # order the factors as gut > actual 
+  mutate(type = fct_relevel(type,
+                            "gut",
+                            "actual")) %>%
+  left_join(domain_data, by = "session_id")
+
+# model
+fit_3 <- lmer(rating ~ type + (type | domain),
+              data = extremity_ratings_data)
+
+# table
+sjt.lmer(fit_3, 
+         p.kr = FALSE,
+         show.std = TRUE)
+
+# plot
+sjp.lmer(fit_3, 
+         p.kr = FALSE,
+         type = "fe")
+
+```
+
+
