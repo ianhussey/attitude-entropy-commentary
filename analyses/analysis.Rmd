@@ -115,11 +115,17 @@ frequency_data <- trimmed_data %>%
 fit_1 <- lm(frequency_think ~ D_alpha,
             data = frequency_data)
 
-# data
-sjt.lm(fit_1, show.std = TRUE)
+# table
+tab_model(fit_1, 
+          emph.p = FALSE, 
+          show.std = TRUE,
+          #show.se = TRUE,
+          col.order = c("est", "se", "ci", "std.est", "std.se", "std.ci",
+                        "stat", "p", "df", "response.level"))
 
 # plot
-sjp.lm(fit_1)
+plot_model(fit_1,
+           type = "est")
 
 ```
 
@@ -132,10 +138,16 @@ fit_2 <- lm(frequency_think ~ D_omega_t,
             data = frequency_data)
 
 # table
-sjt.lm(fit_2, show.std = TRUE)
+tab_model(fit_2, 
+          emph.p = FALSE, 
+          show.std = TRUE,
+          #show.se = TRUE,
+          col.order = c("est", "se", "ci", "std.est", "std.se", "std.ci",
+                        "stat", "p", "df", "response.level"))
 
 # plot
-sjp.lm(fit_2)
+plot_model(fit_2,
+           type = "est")
 
 ```
 
@@ -143,7 +155,7 @@ sjp.lm(fit_2)
 
 "Attitudes are expected to be less polarized than when individuals are given more time to answer the questions""
 
-extremity_actual < extremity_gut
+extremity_gut < extremity_actual
 
 ```{r}
 
@@ -171,7 +183,9 @@ extremity_ratings_data <- trimmed_data %>%
   # order the factors as gut > actual 
   mutate(type = fct_relevel(type,
                             "gut",
-                            "actual")) %>%
+                            "actual"),
+         type_numeric = ifelse(type == "gut", -0.5, 
+                               ifelse(type == "actual", +0.5, NA))) %>%
   left_join(domain_data, by = "session_id")
 
 # model
@@ -179,14 +193,16 @@ fit_3 <- lmer(rating ~ type + (type | domain),
               data = extremity_ratings_data)
 
 # table
-sjt.lmer(fit_3, 
-         p.kr = FALSE,
-         show.std = TRUE)
+tab_model(fit_3, 
+          emph.p = FALSE, 
+          show.std = TRUE,
+          #show.se = TRUE,
+          col.order = c("est", "se", "ci", "std.est", "std.se", "std.ci",
+                        "stat", "p", "df", "response.level"))
 
 # plot
-sjp.lmer(fit_3, 
-         p.kr = FALSE,
-         type = "fe")
+plot_model(fit_3,
+           type = "est")
 
 ```
 
